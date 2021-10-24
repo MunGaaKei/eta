@@ -1,0 +1,23 @@
+{
+  "name": "tiu",
+  "version": "1.0.0",
+  "description": "web components development",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MunGaaKei/tiu.git"
+  },
+  "keywords": [
+    "web",
+    "components"
+  ],
+  "author": "iann",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/MunGaaKei/tiu/issues"
+  },
+  "homepage": "https://github.com/MunGaaKei/tiu#readme"
+}

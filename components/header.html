@@ -1,0 +1,19 @@
+<header class="header">
+    <a href="/pages/demo.html">DEMO</a>
+    <button @click="handleClick">click</button>
+</header>
+
+<style scoped>
+.header {
+    display: flex;
+    background: #fafafa;
+}
+</style>
+
+<script>
+return {
+    handleClick () {
+        console.log(this);
+    }
+}
+</script>
