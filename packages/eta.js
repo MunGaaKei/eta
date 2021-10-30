@@ -12,9 +12,9 @@
     
     var Target = null;          // Current Component
     var Cache  = {};            // Temporarily Save Map Data
-
+    var Context= {};            // Script Context
+    var Events = [];            // Temporarily Save Event Listeners
     var Styles = {};            // Save styles
-    var Scripts= {};            // Save scripts
 
 
     /*
@@ -33,10 +33,11 @@
     **  Mixin Object into HTMLElement
     */
     function mixin ( obj ) {
-        let { init, mounted, removed, template } = obj;
+        let { init, mounted, removed } = obj;
         return class extends HTMLElement {
             constructor () {
                 super ();
+                defaultInit( this, obj );
                 init && init.call(this);
             }
             connectedCallback () {
@@ -55,26 +56,14 @@
     **  Deal with <template>.content
     */
     function format ( tpl, config = {} ) {
-        let { init, mounted, removed, template, pure } = config;
+        let { init, mounted, removed } = config;
         return class extends HTMLElement {
             constructor () {
                 super ();
+                config.template = document.importNode(tpl.content, true);
 
-                let content = document.importNode(tpl.content, true);
-                let slots = handleSlots(this);
+                defaultInit( this, config );
 
-                if ( !pure ) {
-                    Target = this;
-
-                    bindData();
-                    parse(content, slots);
-
-                    Target = Cache = null;
-                }
-                
-                this.append(content);
-
-                content = slots = null;
                 init && init.call(this);
             }
             connectedCallback () {
@@ -82,11 +71,49 @@
                 mounted && mounted.call(this);
             }
             disconnectedCallback () {
-                clearContext( this );
+                clearMemory( this );
                 removed && removed.call(this);
             }
         }
     }
+
+
+
+    /*
+    **  Default initialization
+    */
+    function defaultInit ( target, config ) {
+        let { template, pure } = config;
+        
+        let slots = handleSlots(target);
+        template = typeof template === 'string'? string2html(template): template;
+
+        if ( !pure ) {
+            Target = target;
+
+            var data = bindData();
+            parse(template, slots, data);
+
+            Target = Cache = null;
+        }
+        
+        target.append(template);
+        bindListeners( config, target.tagName.toLowerCase() );
+        Events = [];
+        template = slots = null;
+    }
+
+
+
+    /*
+    **  Transvert string to html node
+    */
+    function string2html ( string ) {
+        var tpl = document.createElement('TEMPLATE');
+        tpl.innerHTML = string;
+        return tpl.content;
+    }
+    
 
 
 
@@ -125,7 +152,7 @@
 
         MAP.set(Target, map);
 
-        Target.$data = new Proxy(data, {
+        return new Proxy(data, {
             get (tar, key) {
 
                 if ( Target ) {
@@ -144,35 +171,67 @@
 
 
 
+    /*
+    **  Bind listeners on target nodes
+    */
+    function bindListeners ( context, tag ) {
+        for ( let evt of Events ) {
+            let { node, event, fn } = evt;
+            if ( !context[fn] ) {
+                context = Context[tag];
+            }
+            node.addEventListener(
+                event,
+                context[fn].bind(context)
+            );
+        }
+    }
+
+
+
 
     /*
     **  Parse <template>.content
     **  1. replace slots with nodes
     **  2. compile text node with data
+    **  3. extract style and put it in <style scope="eta" />
     */
-    function parse ( content, slots ) {
+    function parse ( content, slots, data ) {
         let nodes = content.childNodes;
         for ( let node of nodes ) {
             if ( node.nodeType === 1 ) {
-                if ( node.tagName === 'SLOT' ) {
-                    let frag = document.createDocumentFragment();
-                    let children = Target.childNodes;
-                    let name = node.getAttribute('name');
+                switch (node.tagName) {
+                    case 'SLOT':
+                        let frag = document.createDocumentFragment();
+                        let name = node.getAttribute('name');
 
-                    for ( let child of children ) {
-                        if ( name && slots[name] ) {
-                            node.replaceWith( slots[name] );
-                        } else {
-                            frag.append(child);
-                        }
-                    }
+                        Array.from(Target.childNodes).map(child => {
+                            if ( name && slots[name] ) {
+                                node.replaceWith( slots[name] );
+                            } else {
+                                frag.append(child);
+                            }
+                        });
+                        
+                        node.replaceWith( frag );
+                        break;
+                    
+                    case 'STYLE':
+                        insertStyle( Target.tagName.toLowerCase(), node );
+                        break;
 
-                    node.replaceWith( frag );
-                } else {
-                    parse( node, slots );
+                    case 'SCRIPT':
+                        // node.remove();
+                        break;
+
+                    default:
+                        handleAttributes( node );
+                        parse( node, slots, data );
+                    break;
                 }
+
             } else if ( node.nodeType === 3 ) {
-                node.textContent = compile(node.textContent, Target.$data, node);
+                node.textContent = compile(node.textContent, data || {}, node);
             }
         }
     }
@@ -198,6 +257,32 @@
 
 
 
+
+    /*
+    **  Handle with special attributes on node
+    */
+    function handleAttributes ( node ) {
+        var attrs = node.attributes;
+        for ( let attr of attrs ) {
+            let { name, value } = attr;
+            if ( name.startsWith('@') ) {
+                Events.push({
+                    node,
+                    event: name.substr(1),
+                    fn: value
+                });
+                node.removeAttribute(name);
+            } else if ( name.startsWith(':') ) {
+                // reserved
+                node.removeAttribute(name);
+            }
+        }
+    }
+
+
+
+
+
     /*
     **  Update the relation among ⬇
     **  node <==> property <==> rawtext
@@ -216,7 +301,7 @@
     /*
     **  Clear the memory of [target]
     */
-    function clearContext ( target ) {
+    function clearMemory ( target ) {
         let map = MAP.get(target);
         for (let o in map) {
             for (let [node] of map[o] ) {
@@ -226,9 +311,27 @@
             map[o] = null;
         }
         MAP.delete(target);
-        target.$data = target = null;
+        target = null;
     }
 
+
+
+
+    /*
+    **  Insert style of Component[tag]
+    */
+    var DOMStyle = document.createElement('style');
+    DOMStyle.setAttribute('scope', 'eta');
+    document.head.append(DOMStyle);
+    function insertStyle ( tag, node ) {
+        if ( !Styles[tag] ) {
+            node.setAttribute('name', tag);
+            DOMStyle.append(node);
+            Styles[tag] = node;
+        } else {
+            node.remove();
+        }
+    }
 
 
 
@@ -248,48 +351,51 @@
     }
 
 
-    
-    /*
-    **  Fetch html template
-    */
-    async function load ( url, tag ) {
-        let res = await fetch(url, {
-            headers: {
-                "Content-Type": "text/html; charset=UTF-8"
-            },
-        });
-        let html = await res.text();
 
-        html = extractStyles( html, tag );
-        html = extractScripts( html, tag );
+    // /*
+    // **  Fetch html template
+    // */
+    // async function load ( url, tag ) {
+    //     let res = await fetch(url, {
+    //         headers: {
+    //             "Content-Type": "text/html; charset=UTF-8"
+    //         },
+    //     });
+    //     let html = await res.text();
 
-        return mixin({
-            template: html,
-            init () {
+    //     html = extractStyles( html, tag );
+
+    //     return mixin({
+    //         template: html,
+    //         init () {
                 
-            }
-        });
-    }
+    //         }
+    //     });
+    // }
+
+
+    // /*
+    // **  Extract styles from the template
+    // */
+    // function extractStyles ( text, tag ) {
+    //     return text.replace(/<style[^>]*?>(?:.|\n)*?<\/style>/ig, function ( match ) {
+    //         Styles[tag] = match;
+    //         return '';
+    //     });
+    // }
+    
 
 
     /*
-    **  Extract styles from the template
+    **  Check if the [Component] has been defined
     */
-    function extractStyles ( text, tag ) {
-        return text.replace(/<style[^>]*?>(?:.|\n)*?<\/style>/ig, function ( match ) {
-            Styles[tag] = match;
-            return '';
-        });
-    }
-
-    /*
-    **  Extract script from the template
-    */
-    function extractScripts ( text, tag ) {
-        return text.replace(/<script[^>]*?>(?:.|\n)*?<\/script>/ig, function ( match ) {
-            Scripts[tag] = match;
-            return '';
-        });
+    function isRigistered ( tag ) {
+        if ( STORE[tag] ) {
+            console.error(`The component has been registered: [${tag}]`);
+            return true;
+        } else {
+            return false;
+        }
     }
 
 
@@ -297,11 +403,14 @@
     /*
     **  Install [Component] with template by tag
     */
-    ETA.install = function install ( tag, config = {} ) {
+    function install ( tag, config = {}, template ) {
+        if ( isRigistered(tag) ) {
+            return;
+        }
         customElements.define(
             tag,
             format(
-                search(tag),
+                template || search(tag),
                 config
             )
         );
@@ -315,6 +424,9 @@
     **  ${Component} <Object> || <Class> || <String>
     */
     ETA.use = function use ( component, tag ) {
+        if ( isRigistered(tag) ) {
+            return;
+        }
         if ( typeof component === 'string' ) {
             load( component, tag ).then(component => {
                 customElements.define(
@@ -324,13 +436,42 @@
             });
         } else {
             let isHTMLElementType = Object.prototype.toString.call(component.prototype) === '[object HTMLElement]';
-            
+
             customElements.define(
-                tag? tag: component.name,
+                tag,
                 isHTMLElementType? component: mixin( component )
             );
         }
+        STORE[tag] = true;
     }
+
+
+
+    /*
+    **  Set context for a component
+    */
+    ETA.set = function set ( tag, context ) {
+        Context[tag] = context;
+    }
+
+
+
+
+    /*
+    **  Regist [Component] when document loaded
+    */
+    document.addEventListener('DOMContentLoaded', function(){
+        var templates = document.querySelectorAll('template[name]');
+        templates && templates.forEach(function(tpl){
+            var tag = tpl.getAttribute('name');
+            install(
+                tag,
+                {},
+                tpl
+            );
+        });
+    });
+
 
 
     return ETA;

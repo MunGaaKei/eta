@@ -1,3 +1,14 @@
+:root {
+    --font: normal 400 14px/1.5 -apple-system, BlinkMacSystemFont, Oxygen, Ubuntu, Cantarell, Consolas, 'Open Sans', 'Helvetica Neue', sans-serif;
+    --color: #262223;
+    --color-vice: #a1a1a1;
+
+    --theme-color: #404040;
+    --theme-color-vice: #313131;
+    --theme-color-active: #469af5;
+    --theme-color-reverse: #fff;
+    --theme-color-hover: #e3e3e3;
+}
 article,aside,dialog,footer,header,section,footer,nav,figure,menu{display:block}
 body,h1,h2,h3,h4,h5,h6,hr,p,blockquote,dl,dt,dd,ul,ol,li,pre,form,figure,fieldset,legend,button,img,input,textarea,th,td{margin:0;padding:0;border:0;}
 h1,h2,h3,h4,h5,h6,p,article,section,body{line-height: 1.5}

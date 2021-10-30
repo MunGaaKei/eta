@@ -4,16 +4,162 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Web Component ETA</title>
     <link rel="stylesheet" href="./assets/eta.css">
+    <link rel="stylesheet" href="./assets/page.css">
+    <link rel="stylesheet" href="./assets/prism.css">
 </head>
 <body>
 
-    <i-header current="home"></i-header>
+    <div class="container">
+        <div class="sidebar">
+            <h1>ETA</h1>
+            <a href="#intro">介绍</a>
+            <a href="#basic">基本</a>
+            <a href="#use">eta.use</a>
+            <a href="#data">数据控制</a>
+        </div>
+        <div class="content">
+
+            <h2 id="intro">介绍</h2>
+            <p>基于 Web Components 标准，把原生HTML封装为灵活且可复用的组件。</p>
+
+
+            <h2 id="basic">#基本</h2>
+            <h3>通过 &lt;template&gt; 编写</h3>
+            <p>页面加载完后会自动根据 template 标签的 name 属性值注册组件。</p>
+            <br>
+
+            <!-- <i-input btn="提交"></i-input> -->
+
+            <eta-code>
+                <pre class="language-html"><code class="language-html">
+/* use component */
+&lt;i-input btn="提交"&gt;&lt;/i-input&gt;
+
+/* component template */
+&lt;template name="i-input"&gt;
+&lt;input type="text" class="i-input">
+&lt;button class="i-input-btn">#btn#&lt;/button>
+&lt;style>
+    i-input {
+        display: flex;
+    }
+    .i-input {
+        padding: 4px 8px;
+        background: #eee;
+        outline: none;
+    }
+    .i-input-btn {
+        padding: 4px 8px;
+        background: #bfceff;
+    }
+&lt;/style>
+&lt;script>
+eta.set('i-input', {
+    handleSubmit (e) {
+        console.log(this, e);
+    }
+})
+&lt;/script>
+&lt;/template&gt;
+                </code></pre>
+            </eta-code>
+
+            <h2 id="use">#eta.use( component, tagName )</h2>
+            <h3>组件引入</h3>
+            <br>
+            <!-- <i-banner title="BANNER"></i-banner> -->
+            <pre class="language-js"><code class="language-js">
+&lt;i-banner title="BANNER">&lt;/i-banner>
+            </code></pre>
+            <pre class="language-js"><code class="language-js">
+import banner from 'banner.js';
+
+eta.use(banner, 'i-banner');
+            </code></pre>
+            <pre class="language-js"><code class="language-js">
+/* banner.js */
+export default {
+    template: `&lt;div class="i-banner">
+        &lt;b>#title#&lt;/b>
+    &lt;/div>
+    
+    &lt;style>
+    .i-banner {
+        text-align: center;
+        line-height: 100px;
+        font-size: 32px;
+        background: black;
+        color: white;
+    }
+    &lt;/style>`,
+}
+            </code></pre>
+
+
+            <h2 id="data">数据控制</h2>
+            <p></p>
+            
+        </div>
+    </div>
+
+
+
+
+
+    <template name="i-input">
+        <input type="text" class="i-input">
+        <button class="i-input-btn" @click="handleSubmit">#btn#</button>
+        <style>
+            i-input {
+                display: flex;
+            }
+            .i-input {
+                padding: 4px 8px;
+                background: #eee;
+                outline: none;
+            }
+            .i-input-btn {
+                padding: 4px 8px;
+                background: #bfceff;
+            }
+        </style>
+        <script>
+            eta.set('i-input', {
+                count: 0,
+                handleSubmit (e) {
+                    this.count ++;
+                }
+            })
+        </script>
+    </template>
+
+    <template name="eta-code">
+        <a class="btn" @click="toggle">#text#</a>
+        <div class="eta-code-content hidden">
+            <slot></slot>
+        </div>
+        <style>
+            .eta-code-content.hidden {
+                display: none;
+            }
+        </style>
+        <script>
+            eta.set('eta-code', {
+                text: 1,
+                toggle () {
+                    console.log(this.text);
+                }
+            })
+        </script>
+    </template>
+
+
 
     <script src="./packages/eta.js" type="module"></script>
     <script type="module">
-        // eta.use('./components/header.html', 'i-header');
-        
-
+        import banner from './components/banner.js';
+        eta.use(banner, 'i-banner');
     </script>
+    <script src="./assets/prism.js"></script>
 </body>
 </html>
